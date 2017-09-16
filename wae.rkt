@@ -27,11 +27,34 @@
              (symbol? (first (second sexp))))
         (with (first (second sexp))
               (parse (second (second sexp)))
-              (parse (third sexp)))]
-       [else
-        (error "parse error")])]
-    [else
-     (error "parse error")]))
+              (parse (third sexp)))])]))
 
 (test (parse '{with {x {+ 5 5}} {+ x x}})
       (with 'x (add (num 5) (num 5)) (add (id 'x) (id 'x))))
+
+;; subst: WAE symbol WAE -> WAE
+;; substitutes second argument with third argument in first argument,
+;; as per the rules of substitution; the resulting expression contains
+;; no free instances of the second argument
+
+(define (subst expr sub-id val)
+  (type-case WAE expr
+    [num (n) expr]
+    [add (l r) (add (subst l sub-id val)
+                    (subst r sub-id val))]
+    [sub (l r) (sub (subst l sub-id val)
+                    (subst r sub-id val))]
+    [with (bound-id named-expr bound-body)
+          (if (symbol=? sub-id bound-id)
+              expr
+              (with bound-id
+                    named-expr
+                    (subst bound-body sub-id val)))]
+    [id (v) (if (symbol=? v sub-id) val expr)]))
+
+(test (subst (parse '{+ x {with {x 3} x}}) 'x (num 5))
+      (add (num 5)
+           (with 'x (num 3) (id 'x))))
+(test (subst (parse '{+ x {with {y 3} x}}) 'x (num 5))
+      (add (num 5)
+           (with 'y (num 3) (num 5))))
