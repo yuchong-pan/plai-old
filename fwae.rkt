@@ -120,3 +120,17 @@
 (test (interp (parse '{{fun {x} {+ x x}} {+ 3 4}})) (num 14))
 (test (interp (parse '{{{fun {x} x} {fun {x} {+ x 5}}} 3})) (num 8))
 (test (interp (parse '{with {x 3} {fun {y} {+ x y}}})) (fun 'y (add (num 3) (id 'y))))
+
+;; pre-process : FWAE -> FWAE
+(define (pre-process expr)
+  (type-case FWAE expr
+    [num (n) expr]
+    [add (l r) expr]
+    [with (bound-id named-expr bound-body)
+          (app (fun bound-id bound-body) named-expr)]
+    [id (v) expr]
+    [fun (bound-id bound-body) expr]
+    [app (fun-expr arg-expr) expr]))
+
+(test (pre-process (parse '{with {x 3} {+ x x}}))
+      (app (fun 'x (add (id 'x) (id 'x))) (num 3)))
