@@ -13,6 +13,10 @@
           (arg-name symbol?)
           (body F1WAE?)])
 
+(define-type DefrdSub
+  [mtSub]
+  [aSub (name symbol?) (value number?) (ds DefrdSub?)])
+
 ;; parse : sexp -> F1WAE
 (define (parse sexp)
   (cond [(number? sexp) (num sexp)]
@@ -99,46 +103,62 @@
                               (fundef 'g 'y (with 'x (num 5) (add (id 'y) (id 'x))))))
       (fundef 'f 'x (add (id 'x) (id 'x))))
 
-;; interp : F1WAE listof(FunDef) -> number
-(define (interp expr fun-defs)
+;; lookup : symbol DefrdSub -> number
+(define (lookup name ds)
+  (type-case DefrdSub ds
+    [mtSub () (error 'lookup "no binding for identifier")]
+    [aSub (bound-name bound-value rest-ds)
+          (if (symbol=? bound-name name)
+              bound-value
+              (lookup name rest-ds))]))
+
+(test (lookup 'x (aSub 'y 3 (aSub 'x 5 (mtSub)))) 5)
+
+;; interp : F1WAE listof(FunDef) DefrdSub -> number
+(define (interp expr fun-defs ds)
   (type-case F1WAE expr
     [num (n) n]
-    [add (l r) (+ (interp l fun-defs)
-                  (interp r fun-defs))]
+    [add (l r) (+ (interp l fun-defs ds)
+                  (interp r fun-defs ds))]
     [with (bound-id named-expr bound-body)
-          (interp (subst bound-body
-                         bound-id
-                         (num (interp named-expr fun-defs)))
-                  fun-defs)]
-    [id (v) (error 'interp "free identifier")]
+          (interp bound-body
+                  fun-defs
+                  (aSub bound-id
+                        (interp named-expr fun-defs ds)
+                        ds))]
+    [id (v) (lookup v ds)]
     [app (fun-name arg-expr)
          (local [(define the-fun-def (lookup-fundef fun-name fun-defs))]
-           (interp (subst (fundef-body the-fun-def)
-                          (fundef-arg-name the-fun-def)
-                          (num (interp arg-expr fun-defs)))
-                   fun-defs))]
+           (interp (fundef-body the-fun-def)
+                   fun-defs
+                   (aSub (fundef-arg-name the-fun-def)
+                         (interp arg-expr fun-defs ds)
+                         (mtSub))))]
     [if0 (condition true-clause false-clause)
-         (if (zero? (interp condition fun-defs))
-             (interp true-clause fun-defs)
-             (interp false-clause fun-defs))]))
+         (if (zero? (interp condition fun-defs ds))
+             (interp true-clause fun-defs ds)
+             (interp false-clause fun-defs ds))]))
 
-(test (interp (parse '5) '()) 5)
-(test (interp (parse '{+ 3 4}) '()) 7)
-(test (interp (parse '{with {x 3} {+ x x}}) '()) 6)
-(test (interp (parse '{with {x 5} {+ x {with {x 3} x}}}) '()) 8)
-(test (interp (parse '{with {x 5} {+ x {with {y 3} x}}}) '()) 10)
+(test (interp (parse '5) '() (mtSub)) 5)
+(test (interp (parse '{+ 3 4}) '() (mtSub)) 7)
+(test (interp (parse '{with {x 3} {+ x x}}) '() (mtSub)) 6)
+(test (interp (parse '{with {x 5} {+ x {with {x 3} x}}}) '() (mtSub)) 8)
+(test (interp (parse '{with {x 5} {+ x {with {y 3} x}}}) '() (mtSub)) 10)
 (test (interp (parse '{with {x 5} {f x}})
-              (list (fundef 'f 'x (add (id 'x) (id 'x)))))
+              (list (fundef 'f 'x (add (id 'x) (id 'x))))
+              (mtSub))
       10)
 (test (interp (parse '{double {double 5}})
               (list (fundef 'double
                             'n
-                            (add (id 'n) (id 'n)))))
+                            (add (id 'n) (id 'n))))
+              (mtSub))
       20)
 (test (interp (parse '{sum 5})
               (list (fundef 'sum
                             'n
                             (if0 (id 'n)
                                  (num 0)
-                                 (add (id 'n) (app 'sum (add (id 'n) (num -1))))))))
+                                 (add (id 'n) (app 'sum (add (id 'n) (num -1)))))))
+              (mtSub))
       15)
