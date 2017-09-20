@@ -10,7 +10,8 @@ data WAE = Num Int
          | Fun Identifier WAE
          | App WAE WAE
 data Value = NumV Int
-           | FunV (Value -> Value) deriving Show
+           | FunV (Value -> Value)
+           deriving Show
 
 interp :: WAE -> Env -> Value
 interp (Num n) env = NumV n
