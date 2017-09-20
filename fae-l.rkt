@@ -1,15 +1,15 @@
 #lang plai
 
-(define-type FAE
+(define-type FAE/L
   [num (n number?)]
-  [add (lhs FAE?) (rhs FAE?)]
+  [add (lhs FAE/L?) (rhs FAE/L?)]
   [id (name symbol?)]
-  [fun (param symbol?) (body FAE?)]
-  [app (fun-expr FAE?) (arg-expr FAE?)])
+  [fun (param symbol?) (body FAE/L?)]
+  [app (fun-expr FAE/L?) (arg-expr FAE/L?)])
 
 (define-type DefrdSub
   [mtSub]
-  [aSub (name symbol?) (value FAE?) (ds DefrdSub?)])
+  [aSub (name symbol?) (value FAE/L?) (ds DefrdSub?)])
 
 ;; num-sexp? : sexp -> boolean
 (define (num-sexp? sexp)
@@ -74,7 +74,7 @@
 (test (pre-process '{with {x 1} {{fun {y} {+ y x}} 3}})
       '{{fun {x} {{fun {y} {+ y x}} 3}} 1})
 
-;; parse : sexp -> FAE
+;; parse : sexp -> FAE/L
 (define (parse sexp)
   (cond [(num-sexp? sexp) (num sexp)]
         [(add-sexp? sexp) (add (parse (second sexp))
@@ -93,7 +93,7 @@
                                                              (fun 'x (add (id 'x) (num 1))))
                                                         (num 3)))
 
-;; lookup : symbol DefrdSub -> FAE
+;; lookup : symbol DefrdSub -> FAE/L
 (define (lookup name ds)
   (cond [(mtSub? ds) (error 'lookup "no binding for identifier")]
         [(symbol=? name (aSub-name ds)) (aSub-value ds)]
@@ -102,13 +102,13 @@
 (test (lookup 'x (aSub 'y (num 3) (aSub 'x (fun 'x (add (id 'x) (id 'x))) (mtSub))))
       (fun 'x (add (id 'x) (id 'x))))
 
-;; add-numbers : FAE FAE -> FAE
+;; add-numbers : FAE/L FAE/L -> FAE/L
 (define (add-numbers a b)
   (num (+ (num-n a) (num-n b))))
 
-;; interp : FAE DefrdSub -> FAE
+;; interp : FAE/L DefrdSub -> FAE/L
 (define (interp expr ds)
-  (type-case FAE expr
+  (type-case FAE/L expr
     [num (n) (num n)]
     [add (l r) (add-numbers (interp l ds) (interp r ds))]
     [id (v) (lookup v ds)]
