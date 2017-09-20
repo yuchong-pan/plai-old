@@ -3,17 +3,17 @@ import Text.Show.Functions
 type Identifier = String
 
 type Env = [(Identifier, Value)]
-data WAE = Num Int
-         | Add WAE WAE
+data FWAE = Num Int
+         | Add FWAE FWAE
          | Id Identifier
-         | With Identifier WAE WAE
-         | Fun Identifier WAE
-         | App WAE WAE
+         | With Identifier FWAE FWAE
+         | Fun Identifier FWAE
+         | App FWAE FWAE
 data Value = NumV Int
            | FunV (Value -> Value)
            deriving Show
 
-interp :: WAE -> Env -> Value
+interp :: FWAE -> Env -> Value
 interp (Num n) env = NumV n
 interp (Add lhs rhs) env = add_numbers (interp lhs env) (interp rhs env)
 interp (Id i) env = lookup_id i env
