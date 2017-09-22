@@ -4,7 +4,7 @@
   [num (n number?)]
   [add (lhs CFAE/L?) (rhs CFAE/L?)]
   [id (v symbol?)]
-  [fun (arg-name symbol?) (body CFAE/L?)]
+  [fun (fun-name (or/c false? symbol?)) (arg-name symbol?) (body CFAE/L?)]
   [app (fun-expr CFAE/L?) (arg-expr CFAE/L?)]
   [if0 (condition CFAE/L?) (true-branch CFAE/L?) (false-branch CFAE/L?)]
   [lst (head CFAE/L?) (tail CFAE/L?)]
@@ -14,7 +14,7 @@
 
 (define-type CFAE/L-Value
   [numV (n number?)]
-  [closureV (arg-name symbol?) (body CFAE/L?) (env Env?)]
+  [closureV (fun-name (or/c false? symbol?)) (arg-name symbol?) (body CFAE/L?) (env Env?)]
   [exprV (expr CFAE/L?) (env Env?)]
   [lstV (head CFAE/L-Value?) (tail CFAE/L-Value?)]
   [emptyLstV])
@@ -42,12 +42,14 @@
 
 ;; fun-sexp? : sexp -> boolean
 (define (fun-sexp? sexp)
-  (and (list? sexp) (= (length sexp) 3) (eq? (first sexp) 'fun)
-       (list? (second sexp)) (= (length (second sexp)) 1) (symbol? (first (second sexp)))))
+  (and (list? sexp) (= (length sexp) 4) (eq? (first sexp) 'fun)
+       (or (false? (second sexp)) (symbol? (second sexp)))
+       (list? (third sexp)) (= (length (third sexp)) 1) (symbol? (first (third sexp)))))
 
 ;; app-sexp? : sexp -> boolean
 (define (app-sexp? sexp)
-  (and (list? sexp) (= (length sexp) 2)))
+  (and (list? sexp) (= (length sexp) 2)
+       (not (or (eq? (first sexp) 'hd) (eq? (first sexp) 'tl)))))
 
 ;; if0-sexp? : sexp -> boolean
 (define (if0-sexp? sexp)
@@ -77,13 +79,15 @@
                                 (pre-process (second sexp))
                                 (pre-process (third sexp)))]
         [(with-sexp? sexp) (list (list 'fun
+                                       #f
                                        (list (first (second sexp)))
                                        (pre-process (third sexp)))
                                  (pre-process (second (second sexp))))]
         [(id-sexp? sexp) sexp]
         [(fun-sexp? sexp) (list 'fun
-                                (list (first (second sexp)))
-                                (pre-process (third sexp)))]
+                                (second sexp)
+                                (list (first (third sexp)))
+                                (pre-process (fourth sexp)))]
         [(hd-sexp? sexp) (list 'hd (pre-process (second sexp)))]
         [(tl-sexp? sexp) (list 'tl (pre-process (second sexp)))]
         [(app-sexp? sexp) (list (pre-process (first sexp))
@@ -98,19 +102,18 @@
         [(emptyLst-sexp? sexp) sexp]))
 
 (test (pre-process '{with {x 1} {+ x x}})
-      '{{fun {x} {+ x x}} 1})
-(test (pre-process '{with {double {fun {x} {+ x x}}}
+      '{{fun #f {x} {+ x x}} 1})
+(test (pre-process '{with {double {fun double {x} {+ x x}}}
                           {with {y 9}
                                 {double y}}})
-      '{{fun {double}
-             {{fun {y}
-                   {double y}}
-              9}}
-        {fun {x} {+ x x}}})
+      '{{fun #f
+             {double}
+             {{fun #f {y} {double y}} 9}}
+        {fun double {x} {+ x x}}})
 (test (pre-process '{with {x 1} {with {y 3} {if0 x {+ y y} {+ y {+ y y}}}}})
-      '{{fun {x}
-             {{fun {y}
-                   {if0 x {+ y y} {+ y {+ y y}}}}
+      '{{fun #f
+             {x}
+             {{fun #f {y} {if0 x {+ y y} {+ y {+ y y}}}}
               3}}
         1})
 
@@ -120,8 +123,9 @@
         [(add-sexp? sexp) (add (parse (second sexp))
                                (parse (third sexp)))]
         [(id-sexp? sexp) (id sexp)]
-        [(fun-sexp? sexp) (fun (first (second sexp))
-                               (parse (third sexp)))]
+        [(fun-sexp? sexp) (fun (second sexp)
+                               (first (third sexp))
+                               (parse (fourth sexp)))]
         [(hd-sexp? sexp) (hd (parse (second sexp)))]
         [(tl-sexp? sexp) (tl (parse (second sexp)))]
         [(app-sexp? sexp) (app (parse (first sexp))
@@ -133,12 +137,14 @@
                                (parse (third sexp)))]
         [(emptyLst-sexp? sexp) (emptyLst)]))
 
-(test (parse '{{fun {x} {+ x x}} 1})
-      (app (fun 'x (add (id 'x) (id 'x)))
+(test (parse '{{fun #f {x} {+ x x}} 1})
+      (app (fun #f 'x (add (id 'x) (id 'x)))
            (num 1)))
 (test (parse (pre-process '{with {x 1} {with {y 3} {if0 x {+ y y} {+ y {+ y y}}}}}))
-      (app (fun 'x
-                (app (fun 'y
+      (app (fun #f
+                'x
+                (app (fun #f
+                          'y
                           (if0 (id 'x)
                                (add (id 'y) (id 'y))
                                (add (id 'y) (add (id 'y) (id 'y)))))
@@ -154,10 +160,10 @@
 (test (lookup 'y (consEnv 'x
                           (exprV (num 3) (emptyEnv))
                           (consEnv 'y
-                                   (exprV (fun 'x (add (id 'x) (id 'delta)))
+                                   (exprV (fun 'add-delta 'x (add (id 'x) (id 'delta)))
                                           (consEnv 'delta (exprV (num 1) (emptyEnv)) (emptyEnv)))
                                    (emptyEnv))))
-      (exprV (fun 'x (add (id 'x) (id 'delta)))
+      (exprV (fun 'add-delta 'x (add (id 'x) (id 'delta)))
              (consEnv 'delta (exprV (num 1) (emptyEnv)) (emptyEnv))))
 
 (define (interp expr)
@@ -188,12 +194,16 @@
       [add (l r) (num+ (interp l env)
                        (interp r env))]
       [id (v) (lookup v env)]
-      [fun (arg-name body) (closureV arg-name body env)]
+      [fun (fun-name arg-name body) (closureV fun-name arg-name body env)]
       [app (fun-expr arg-expr) (local [(define the-fun (strict (interp fun-expr env)))]
                                  (interp (closureV-body the-fun)
                                          (consEnv (closureV-arg-name the-fun)
                                                   (exprV arg-expr env)
-                                                  (closureV-env the-fun))))]
+                                                  (if (false? (closureV-fun-name the-fun))
+                                                      (closureV-env the-fun)
+                                                      (consEnv (closureV-fun-name the-fun)
+                                                               the-fun
+                                                               (closureV-env the-fun))))))]
       [if0 (condition true-branch false-branch) (if (num-zero? (interp condition env))
                                                     (interp true-branch env)
                                                     (interp false-branch env))]
@@ -215,7 +225,24 @@
 (test (interp (parse (pre-process '{with {x 0} {if0 x {+ 1 2} {undef y}}}))) (numV 3))
 (test (interp (parse (pre-process '{}))) (emptyLstV))
 (test (interp (parse (pre-process '{lst 1 {lst 2 {}}}))) (lstV (numV 1) (lstV (numV 2) (emptyLstV))))
-(test (interp (parse (pre-process '{lst 1 {lst {fun {x} {+ x x}} {}}})))
-      (lstV (numV 1) (lstV (closureV 'x (add (id 'x) (id 'x)) (emptyEnv)) (emptyLstV))))
+(test (interp (parse (pre-process '{lst 1 {lst {fun double {x} {+ x x}} {}}})))
+      (lstV (numV 1) (lstV (closureV 'double 'x (add (id 'x) (id 'x)) (emptyEnv)) (emptyLstV))))
 (test (interp (parse (pre-process '{hd {lst 1 {lst 2 {lst 3 {}}}}}))) (numV 1))
 (test (interp (parse (pre-process '{tl {lst 1 {lst 2 {lst 3 {}}}}}))) (lstV (numV 2) (lstV (numV 3) (emptyLstV))))
+(test (interp (parse (pre-process '{{fun sum
+                                         {x}
+                                         {if0 x
+                                              0
+                                              {+ x {sum {+ x -1}}}}}
+                                    5})))
+      (numV 15))
+(test (interp (parse (pre-process '{{fun fib
+                                         {n}
+                                         {if0 n
+                                              0
+                                              {if0 {+ n -1}
+                                                   1
+                                                   {+ {fib {+ n -1}}
+                                                      {fib {+ n -2}}}}}}
+                                    10})))
+      (numV 55))
