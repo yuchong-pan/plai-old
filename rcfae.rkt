@@ -20,6 +20,7 @@
   [recu (name symbol?) (named-expr RCFAE?) (body RCFAE?)])
 
 (define-type RCFAE-Value
+  [noneV]
   [numV (n number?)]
   [closureV (param symbol?) (body RCFAE?) (env Env?)])
 
@@ -95,7 +96,9 @@
                             v
                             (lookup name next))]
     [consRecEnv (n v next) (if (symbol=? name n)
-                               (unbox v)
+                               (if (noneV? (unbox v))
+                                   (error 'lookup "there is no value here yet")
+                                   (unbox v))
                                (lookup name next))]))
 
 (test (lookup 'x (consEnv 'x
@@ -109,7 +112,7 @@
 
 ;; cyclically-bind-and-interp : symbol RCFAE Env -> Env
 (define (cyclically-bind-and-interp fun-name fun-def env)
-  (local [(define value-holder (box (numV 0)))
+  (local [(define value-holder (box (noneV)))
           (define new-env (consRecEnv fun-name value-holder env))
           (define fun-val (interp fun-def new-env))]
     (begin (set-box! value-holder fun-val)
