@@ -4,11 +4,11 @@ type Identifier = String
 
 type Env = [(Identifier, Value)]
 data FWAE = Num Int
-         | Add FWAE FWAE
-         | Id Identifier
-         | With Identifier FWAE FWAE
-         | Fun Identifier FWAE
-         | App FWAE FWAE
+          | Add FWAE FWAE
+          | Id Identifier
+          | With Identifier FWAE FWAE
+          | Fun Identifier FWAE
+          | App FWAE FWAE
 data Value = NumV Int
            | FunV (Value -> Value)
            deriving Show
