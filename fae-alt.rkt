@@ -14,10 +14,6 @@
   [fun (param symbol?) (body FAE?)]
   [app (fun-expr FAE?) (arg-expr FAE?)])
 
-(define-type FAE-Value
-  [numV (n number?)]
-  [closureV (p procedure?)])
-
 ;; Env? : any -> boolean
 (define (Env? x)
   (procedure? x))
@@ -64,25 +60,18 @@
 ;; interp : FAE Env -> FAE-Value
 (define (interp expr env)
   (type-case FAE expr
-    [num (n) (numV n)]
-    [add (l r) (num+ (interp l env)
-                     (interp r env))]
+    [num (n) n]
+    [add (l r) (+ (interp l env)
+                  (interp r env))]
     [id (v) (lookup v env)]
-    [fun (param body) (closureV (lambda (arg-val)
-                                  (interp body
-                                          (aSub param arg-val env))))]
-    [app (fun-expr arg-expr) ((closureV-p (interp fun-expr env))
+    [fun (param body) (lambda (arg-val)
+                        (interp body
+                                (aSub param arg-val env)))]
+    [app (fun-expr arg-expr) ((interp fun-expr env)
                               (interp arg-expr env))]))
 
-;; num+ : FAE-Value FAE-Value -> FAE-Value
-(define (num+ n1 n2)
-  (numV (+ (numV-n n1)
-           (numV-n n2))))
-
-(test (num+ (numV 1) (numV 2)) (numV 3))
-
-(test (interp (parse '{with {x 1} {+ x x}}) (mtSub)) (numV 2))
-(test (interp (parse '{{fun {x} {+ x x}} 1}) (mtSub)) (numV 2))
+(test (interp (parse '{with {x 1} {+ x x}}) (mtSub)) 2)
+(test (interp (parse '{{fun {x} {+ x x}} 1}) (mtSub)) 2)
 (test (interp (parse '{with {d 1} {with {add-d {fun {x} {+ x d}}} {add-d 5}}})
-                (mtSub))
-      (numV 6))
+              (mtSub))
+      6)
