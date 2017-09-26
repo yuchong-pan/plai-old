@@ -16,7 +16,7 @@
 
 (define-type FAE-Value
   [numV (n number?)]
-  [closureV (param symbol?) (body FAE?) (env Env?)])
+  [closureV (p procedure?)])
 
 ;; Env? : any -> boolean
 (define (Env? x)
@@ -68,12 +68,11 @@
     [add (l r) (num+ (interp l env)
                      (interp r env))]
     [id (v) (lookup v env)]
-    [fun (param body) (closureV param body env)]
-    [app (fun-expr arg-expr) (local [(define the-fun (interp fun-expr env))]
-                               (interp (closureV-body the-fun)
-                                       (aSub (closureV-param the-fun)
-                                             (interp arg-expr env)
-                                             env)))]))
+    [fun (param body) (closureV (lambda (arg-val)
+                                  (interp body
+                                          (aSub param arg-val env))))]
+    [app (fun-expr arg-expr) ((closureV-p (interp fun-expr env))
+                              (interp arg-expr env))]))
 
 ;; num+ : FAE-Value FAE-Value -> FAE-Value
 (define (num+ n1 n2)
