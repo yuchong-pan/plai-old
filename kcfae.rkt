@@ -17,7 +17,8 @@
   [fun (param symbol?) (body KCFAE?)]
   [app (fun-expr KCFAE?) (arg-expr KCFAE?)]
   [if0 (test KCFAE?) (truth KCFAE?) (falsity KCFAE?)]
-  [bindcc (cont-var symbol?) (body KCFAE?)])
+  [bindcc (cont-var symbol?) (body KCFAE?)]
+  [web-read (prompt string?)])
 
 (define-type KCFAE-Value
   [numV (n number?)]
@@ -59,16 +60,18 @@
               (list? (second sexp)) (= (length (second sexp)) 1) (symbol? (first (second sexp))))
          (fun (first (second sexp))
               (parse (third sexp)))]
-        [(and (list? sexp) (= (length sexp) 2))
-         (app (parse (first sexp))
-              (parse (second sexp)))]
         [(and (list? sexp) (= (length sexp) 4) (eq? (first sexp) 'if0))
          (if0 (parse (second sexp))
               (parse (third sexp))
               (parse (fourth sexp)))]
         [(and (list? sexp) (= (length sexp) 3) (eq? (first sexp) 'bindcc) (symbol? (second sexp)))
          (bindcc (second sexp)
-                 (parse (third sexp)))]))
+                 (parse (third sexp)))]
+        [(and (list? sexp) (= (length sexp) 2) (eq? (first sexp) 'web-read) (string? (second sexp)))
+         (web-read (second sexp))]
+        [(and (list? sexp) (= (length sexp) 2))
+         (app (parse (first sexp))
+              (parse (second sexp)))]))
 
 (test (parse '1) (num 1))
 (test (parse '{+ {+ 3 4} {+ 5 6}}) (add (add (num 3) (num 4))
@@ -81,6 +84,7 @@
 (test (parse '{with {x 0} {if0 x 1 2}}) (app (fun 'x (if0 (id 'x) (num 1) (num 2)))
                                              (num 0)))
 (test (parse '{bindcc x {x 3}}) (bindcc 'x (app (id 'x) (num 3))))
+(test (parse '{web-read "hello-world"}) (web-read "hello-world"))
 
 ;; num+ : KCFAE-Value KCFAE-Value -> KCFAE-Value
 (define (num+ n1 n2)
@@ -135,7 +139,9 @@
                           (contV (lambda (val)
                                    (k val)))
                           env)
-                    k)]))
+                    k)]
+    [web-read (prompt) (k (begin (display prompt)
+                                 (k (numV (read)))))]))
 
 (test (interp (parse '1) (mtSub) (lambda (x) x)) (numV 1))
 (test (interp (parse '{+ {+ 3 4} {+ 5 6}}) (mtSub) (lambda (x) x)) (numV 18))
@@ -153,3 +159,7 @@
               (mtSub)
               (lambda (x) x))
       (numV 2))
+(test (interp (parse '{web-read "input a number: "})
+              (mtSub)
+              (lambda (x) x))
+      (numV 1))
