@@ -159,7 +159,50 @@
               (mtSub)
               (lambda (x) x))
       (numV 2))
+#;
 (test (interp (parse '{web-read "input a number: "})
               (mtSub)
               (lambda (x) x))
       (numV 1))
+(test (interp (parse '{bindcc k 3})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{bindcc k {k 3}})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{bindcc k {+ 1 {k 3}}})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{+ 1 {bindcc k {+ 1 {k 3}}}})
+              (mtSub)
+              (lambda (x) x))
+      (numV 4))
+(test (interp (parse '{{bindcc k
+                               {k {fun {dummy} 3}}}
+                       1729})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{bindcc k
+                              {k
+                               {k
+                                {k 3}}}})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{{{bindcc k k}
+                        {fun {x} x}}
+                       3})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
+(test (interp (parse '{{{{bindcc k k}
+                         {fun {x} x}}
+                        {fun {x} x}}
+                       3})
+              (mtSub)
+              (lambda (x) x))
+      (numV 3))
